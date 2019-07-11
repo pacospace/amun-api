@@ -98,12 +98,12 @@ parameters:
   - name: AMUN_CPU
     description: CPU cores requested for running job.
     displayName: Job CPU
-    default: 500m
+    value: 500m
 
   - name: AMUN_MEMORY
     description: Memory requested for running job.
     displayName: Job Memory
-    default: 256Mi
+    value: 256Mi
 
   - name: AMUN_SPECIFICATION
     description: Inspection specification as posted to Amun API.
