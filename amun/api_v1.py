@@ -22,6 +22,7 @@ import random
 import json
 
 from thoth.common import OpenShift
+from thoth.common import datetime2datetime_str
 from thoth.common.exceptions import NotFoundException
 
 from .configuration import Configuration
@@ -72,13 +73,16 @@ def _do_create_dockerfile(specification: dict) -> tuple:
         return None, str(exc)
 
 
-def _generate_inspection_id():
+def _generate_inspection_id(identifier: str = None) -> str:
     """Generate a random identifier for the given inspection."""
     # A very first method used 'generatedName' in ImageStream configuration,
     # but it looks like there is a bug in OpenShift as it did not generated any
     # name and failed with regexp issues (that were not related to the
     # generateName configuration).
-    return 'inspection-' + "%016x" % random.getrandbits(64)
+    if not identifier:
+        return "inspection-" + "%016x" % random.getrandbits(64)
+
+    return ("inspection-%s-" + "%016x") % (identifier, random.getrandbits(64))
 
 
 def post_generate_dockerfile(specification: dict):
@@ -124,7 +128,7 @@ def post_inspection(specification: dict) -> tuple:
     _adjust_default_requests(specification['run'])
     _adjust_default_requests(specification['build'])
 
-    inspection_id = _generate_inspection_id()
+    inspection_id = _generate_inspection_id(specification.get("identifier"))
     _OPENSHIFT.create_inspection_imagestream(inspection_id)
 
     parameters, use_hw_template = _construct_parameters_dict(specification.get('build', {}))
@@ -138,6 +142,8 @@ def post_inspection(specification: dict) -> tuple:
         run_memory_requests = specification['run']['requests']['memory']
 
     parameters['AMUN_INSPECTION_ID'] = inspection_id
+    # Mark this for later use - in get_inspection_specification().
+    specification["@created"] = datetime2datetime_str()
 
     # Create buildconfig, extend parameters with specification and generated dockerfile for build.
     build_parameters = dict(parameters)
@@ -186,6 +192,12 @@ def get_inspection_job_log(inspection_id: str) -> tuple:
         return {
             'error': 'Job log for the given inspection id was not found',
             'parameters': parameters
+        }, 404
+
+    if not log:
+        return {
+            'error': 'Inspection run did not produce any log or it was deleted by OpenShift',
+            'parameters': parameters,
         }, 404
 
     try:
@@ -276,7 +288,11 @@ def get_inspection_specification(inspection_id: str):
             'parameters': parameters
         }
 
+    specification = json.loads(build['metadata']['annotations']['amun_specification'])
+    # We inserted created information on our own, pop it not to taint the original specification request.
+    created = specification.pop("@created")
     return {
         'parameters': parameters,
-        'specification': json.loads(build['metadata']['annotations']['amun_specification'])
+        'specification': specification,
+        'created': created,
     }

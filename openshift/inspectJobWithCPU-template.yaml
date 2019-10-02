@@ -5,8 +5,8 @@ metadata:
   annotations:
     description: Amun - Execution engine for Thoth
     openshift.io/display-name: Amun API
-    version: 0.0.1
-    tags: poc,amun,thoth,ai-stacks
+    version: 0.5.0
+    tags: amun,thoth,ai-stacks
     template.openshift.io/documentation-url: https://github.com/Thoth-Station/
     template.openshift.io/long-description: >
       This template defines resources needed to run Amun's inspection job on OpenShift.
@@ -43,7 +43,7 @@ objects:
           containers:
             - name: inspect
               env: []
-              image: '${AMUN_INSPECTION_ID}:latest'
+              image: "${AMUN_INSPECTION_ID}:latest"
               livenessProbe:
                 failureThreshold: 1
                 initialDelaySeconds: 3600
@@ -62,7 +62,7 @@ objects:
                   name: hw-info-volume
           initContainers:
             - name: inspect-hwinfo
-              image: inspect-hwinfo
+              image: "${THOTH_REGISTRY}/${THOTH_INFRA_NAMESPACE}/inspect-hwinfo"
               volumeMounts:
                 - mountPath: /home/amun/hwinfo
                   name: hw-info-volume
@@ -76,7 +76,7 @@ objects:
             containerNames: [inspect]
             from:
               kind: ImageStreamTag
-              name: '${AMUN_INSPECTION_ID}:latest'
+              name: "${AMUN_INSPECTION_ID}:latest"
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -100,6 +100,17 @@ objects:
                       - ${PROCESSOR}
 
 parameters:
+  - name: THOTH_REGISTRY
+    description: Registry server from where Image is to be pulled
+    displayName: Registry
+    required: true
+    value: docker-registry.default.svc:5000
+
+  - name: THOTH_INFRA_NAMESPACE
+    description: Project where ImageStream is present
+    displayName: ImageStream Project
+    required: true
+
   - name: AMUN_INSPECTION_ID
     description: Id of inspection that is run.
     displayName: Inspection id
@@ -108,12 +119,12 @@ parameters:
   - name: AMUN_CPU
     description: CPU cores requested for build
     displayName: Build CPU
-    default: 750m
+    value: 750m
 
   - name: AMUN_MEMORY
     description: Memory requested for build
     displayName: Build Memory
-    default: 256Mi
+    value: 256Mi
 
   - name: CPU_FAMILY
     description: Family number of CPU.

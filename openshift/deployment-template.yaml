@@ -4,9 +4,9 @@ metadata:
   name: amun-api-deployment
   annotations:
     description: This is Amun API
-    openshift.io/display-name: 'Amun API'
-    version: 0.4.0
-    tags: poc,amun,thoth,api,ai-stacks
+    openshift.io/display-name: "Amun API"
+    version: 0.5.0
+    tags: amun,thoth,api,ai-stacks
     template.openshift.io/documentation-url: https://github.com/Thoth-Station/
     template.openshift.io/long-description: This is Amun API
     template.openshift.io/provider-display-name: Red Hat, Inc.
@@ -14,6 +14,28 @@ metadata:
     template: amun-api-deployment
     app: amun
     component: amun-api
+
+parameters:
+  - description: Project the ImageStream to be use lives in
+    displayName: ImageStream Project
+    required: true
+    name: IMAGE_STREAM_PROJECT_NAME
+
+  - name: IMAGE_REGISTRY
+    description: Registry server from where Image is to be pulled
+    displayName: Registry
+    required: true
+
+  - description: Tag of the ImageStream to be use
+    displayName: ImageStream Tag
+    required: true
+    name: IMAGE_STREAM_TAG
+    value: "latest"
+
+  - description: Service account to be used which allows ... in operated project.
+    displayName: Service account name
+    required: true
+    name: SERVICE_ACCOUNT_NAME
 
 objects:
   - kind: Route
@@ -59,18 +81,19 @@ objects:
           labels:
             service: amun-api
         spec:
-          serviceAccountName: inspector
+          serviceAccountName: "${SERVICE_ACCOUNT_NAME}"
           containers:
             - name: amun-api
+              image: "${IMAGE_REGISTRY}/${IMAGE_STREAM_PROJECT_NAME}/amun-api:${IMAGE_STREAM_TAG}"
               env:
                 - name: APP_MODULE
-                  value: 'amun.entrypoint:app'
+                  value: "amun.entrypoint:app"
                 - name: KUBERNETES_API_URL
-                  value: 'https://kubernetes.default.svc.cluster.local'
+                  value: "https://kubernetes.default.svc.cluster.local"
                 - name: KUBERNETES_VERIFY_TLS
-                  value: '0'
+                  value: "0"
                 - name: AMUN_DEBUG
-                  value: '0'
+                  value: "0"
                 - name: THOTH_AMUN_INSPECTION_NAMESPACE
                   valueFrom:
                     configMapKeyRef:
@@ -91,6 +114,11 @@ objects:
                     secretKeyRef:
                       name: amun
                       key: sentry-dsn
+                - name: THOTH_DEPLOYMENT_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      key: storage-bucket-name
+                      name: thoth
                 - name: PROMETHEUS_PUSHGATEWAY_HOST
                   valueFrom:
                   configMapKeyRef:
@@ -113,7 +141,7 @@ objects:
                   cpu: "500m"
               readinessProbe:
                 httpGet:
-                  path: '/readiness'
+                  path: "/readiness"
                   port: 8080
                   scheme: HTTP
                 initialDelaySeconds: 5
@@ -121,7 +149,7 @@ objects:
                 timeoutSeconds: 10
               livenessProbe:
                 httpGet:
-                  path: '/liveness'
+                  path: "/liveness"
                   port: 8080
                   scheme: HTTP
                 initialDelaySeconds: 5
@@ -137,7 +165,8 @@ objects:
               - amun-api
             from:
               kind: ImageStreamTag
-              name: 'amun-api:latest'
+              namespace: "${IMAGE_STREAM_PROJECT_NAME}"
+              name: "amun-api:latest"
 
   - kind: ImageStream
     apiVersion: image.openshift.io/v1

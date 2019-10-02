@@ -50,7 +50,7 @@ def _determine_installer_string() -> str:
 
 
 def _obtain_script(script: str) -> str:
-    """Obrain script if it was specified by an URL, if script was provided inline, return it."""
+    """Obtain script if it was specified by an URL, if script was provided inline, return it."""
     if script.startswith(('https://', 'http://')):
         # Download script from remote if needed.
         response = requests.get(script)
@@ -83,12 +83,22 @@ def create_dockerfile(specification: dict) -> tuple:
 
     dockerfile += "USER root\n\n"
 
+    env_str = ''
+    for environ in specification.get("environment", []):
+        env_str += f"{environ['name']}={environ['value']} "
+
+    if env_str:
+        dockerfile += f"ENV {env_str}\n\n"
+
     # Updating the base has to be turned on explicitly.
     if specification.get('update', False):
-        dockerfile += _determine_update_string
+        dockerfile += _determine_update_string()
 
-    if 'packages' in specification:
+    if specification.get('packages'):
         dockerfile += _determine_installer_string() + " ".join(specification['packages']) + '\n\n'
+
+    if specification.get('python_packages'):
+        dockerfile += "RUN pip3 install " + " ".join(specification["python_packages"]) + '\n\n'
 
     for file_spec in specification.get('files', []):
         path = file_spec['path']
